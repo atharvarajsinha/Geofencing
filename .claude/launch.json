@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "geofencing-pwa",
+      "name": "geofencing-pwa-prod",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "runtimeArgs": ["--prefix", "frontend", "run", "start"],
       "port": 3000,
       "autoPort": true
     }

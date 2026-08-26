@@ -20,8 +20,8 @@ export function PwaInstallBanner() {
             <Smartphone className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h4 className="font-bold text-sm">Install GeoPresence PWA</h4>
-            <p className="text-xs text-sky-100">Add to your phone or desktop home screen.</p>
+            <h4 className="font-bold text-sm">Install GeoPresence</h4>
+            <p className="text-xs text-sky-100">Runs full screen, works offline, keeps tracking in the background.</p>
           </div>
         </div>
 

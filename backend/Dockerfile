@@ -30,8 +30,10 @@ USER appuser
 
 EXPOSE 8000
 
+# Follows the same $PORT the server binds to, so the probe still works when the
+# platform assigns one. (Render uses its own HTTP health check, not this.)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:8000/health/ || exit 1
+    CMD curl -fsS "http://localhost:${PORT:-8000}/health/" || exit 1
 
 ENV DJANGO_SETTINGS_MODULE=config.settings.production
 
