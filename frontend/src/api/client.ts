@@ -3,7 +3,7 @@ import { getAccessToken, getRefreshToken, setAuthTokens, clearAuthTokens } from 
 import { ApiResponse } from '@/types/api';
 import { AuthResponseData } from '@/types/auth';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const BASE_URL = process.env.NEXT_API_URL || 'http://localhost:8000/api';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
