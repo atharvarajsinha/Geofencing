@@ -287,6 +287,30 @@ No PostGIS extension is needed. The geometry itself is pure Python and its tests
   [docs/PRIVACY.md](docs/PRIVACY.md).
 * `POST /api/location/update/` is rate limited per user (60/min by default).
 
+### Container boot
+
+The image's `CMD` runs `migrate`, then `ensure_superuser --skip-if-unset`, then
+`collectstatic`, then Gunicorn on `$PORT` (defaulting to 8000).
+
+`ensure_superuser` creates the single super admin from
+`DJANGO_SUPERUSER_EMAIL` / `DJANGO_SUPERUSER_PASSWORD` (and optional
+`DJANGO_SUPERUSER_NAME`). It is idempotent, so a redeploy over an existing
+database is a no-op rather than a failed deploy. **There is no
+`DJANGO_SUPERUSER_USERNAME`**: this project's `User` model has no `username`
+field - email is `USERNAME_FIELD` - and any such variable is ignored.
+
+### Upgrading a database created before the PostGIS removal
+
+`migrate` cannot detect this: the geofence migrations were rewritten in place,
+so an older database already has `0001_initial` recorded and `migrate` reports
+"No migrations to apply" while the table still has geometry columns. Check with:
+
+```bash
+python manage.py check_geofence_schema     # exits 1 if conversion is needed
+```
+
+and convert with [`scripts/migrate_from_postgis.sql`](scripts/migrate_from_postgis.sql).
+
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ---
