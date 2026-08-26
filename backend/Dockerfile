@@ -36,30 +36,25 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 ENV DJANGO_SETTINGS_MODULE=config.settings.production
 
 # ---------------------------------------------------------------------------
-# Run migrations, create superuser if it doesn't exist, collect static files,
+# Boot sequence: migrate, ensure the superuser exists, collect static files,
 # then start Gunicorn.
+#
+# The superuser step is a real management command rather than an inline
+# `shell -c` one-liner. Two reasons the old one-liner broke this image:
+#   * it queried `username`, which this project's User model does not have -
+#     email is USERNAME_FIELD - so every boot exited 1 with a FieldError;
+#   * `createsuperuser`-style creation is not idempotent, so a redeploy over an
+#     existing database would fail even once the field name was right.
+# `ensure_superuser` reports and exits 0 when the admin already exists.
+#
+# $PORT is honoured for platforms that assign one (Render, Heroku, Fly).
 # ---------------------------------------------------------------------------
 CMD ["sh", "-c", \
     "python manage.py migrate --noinput && \
-     python manage.py shell -c \"\
-from django.contrib.auth import get_user_model; \
-import os; \
-User = get_user_model(); \
-username = os.environ.get('DJANGO_SUPERUSER_USERNAME'); \
-email = os.environ.get('DJANGO_SUPERUSER_EMAIL'); \
-password = os.environ.get('DJANGO_SUPERUSER_PASSWORD'); \
-\
-print('Checking Django superuser...'); \
-\
-user = User.objects.filter(username=username).first() if username else None; \
-\
-User.objects.create_superuser(username=username, email=email, password=password) \
-if username and email and password and not user else \
-print('Superuser already exists or credentials are missing.'); \
-\" && \
+     python manage.py ensure_superuser --skip-if-unset && \
      python manage.py collectstatic --noinput && \
-     gunicorn config.wsgi:application \
-     --bind 0.0.0.0:8000 \
+     exec gunicorn config.wsgi:application \
+     --bind 0.0.0.0:${PORT:-8000} \
      --workers 3 \
      --timeout 60 \
      --access-logfile - \
