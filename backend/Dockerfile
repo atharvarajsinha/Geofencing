@@ -25,6 +25,7 @@ COPY . .
 RUN useradd --create-home --uid 10001 appuser \
     && mkdir -p /app/staticfiles \
     && chown -R appuser:appuser /app
+
 USER appuser
 
 EXPOSE 8000
@@ -32,13 +33,34 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:8000/health/ || exit 1
 
-# Static files are collected at build time in CI; do it here for simple setups.
-# collectstatic needs a SECRET_KEY but not a database.
 ENV DJANGO_SETTINGS_MODULE=config.settings.production
 
-CMD ["gunicorn", "config.wsgi:application", \
-     "--bind", "0.0.0.0:8000", \
-     "--workers", "3", \
-     "--timeout", "60", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-"]
+# ---------------------------------------------------------------------------
+# Run migrations, create superuser if it doesn't exist, collect static files,
+# then start Gunicorn.
+# ---------------------------------------------------------------------------
+CMD ["sh", "-c", \
+    "python manage.py migrate --noinput && \
+     python manage.py shell -c \"\
+from django.contrib.auth import get_user_model; \
+import os; \
+User = get_user_model(); \
+username = os.environ.get('DJANGO_SUPERUSER_USERNAME'); \
+email = os.environ.get('DJANGO_SUPERUSER_EMAIL'); \
+password = os.environ.get('DJANGO_SUPERUSER_PASSWORD'); \
+\
+print('Checking Django superuser...'); \
+\
+user = User.objects.filter(username=username).first() if username else None; \
+\
+User.objects.create_superuser(username=username, email=email, password=password) \
+if username and email and password and not user else \
+print('Superuser already exists or credentials are missing.'); \
+\" && \
+     python manage.py collectstatic --noinput && \
+     gunicorn config.wsgi:application \
+     --bind 0.0.0.0:8000 \
+     --workers 3 \
+     --timeout 60 \
+     --access-logfile - \
+     --error-logfile -"]
