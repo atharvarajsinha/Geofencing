@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Custom Leaflet Marker Styling */
+.custom-leaflet-marker, .custom-pin-icon, .custom-vertex-icon {
+  background: transparent;
+  border: none;
+}
+
+/* Safe area padding for mobile notch / gesture bars */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

@@ -1,0 +1,16 @@
+# Runtime dependencies.
+# Pinned to compatible ranges: patch upgrades are welcome, majors are not.
+
+Django>=5.1,<6.0
+djangorestframework>=3.15,<4.0
+djangorestframework-simplejwt>=5.3,<6.0
+django-filter>=24.3
+django-cors-headers>=4.4
+drf-spectacular>=0.27
+django-environ>=0.11
+psycopg[binary]>=3.2
+celery>=5.4,<6.0
+redis>=5.0
+django-celery-beat>=2.7
+whitenoise>=6.7
+gunicorn>=23.0

@@ -1,0 +1,2443 @@
+openapi: 3.0.3
+info:
+  title: Geofencing Presence API
+  version: 1.0.0
+  description: Backend API for a PWA based geofencing attendance/presence system.
+    The backend is the sole authority on presence status; clients only submit raw
+    GPS observations.
+paths:
+  /api/admin/presence/:
+    get:
+      operationId: admin_presence_list
+      description: |-
+        Organization-wide presence records, filtered and paginated.
+
+        ``GET /api/admin/presence/?status=PRESENT&date=2026-08-26``
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: geofence
+        schema:
+          type: number
+      - in: query
+        name: last_seen_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: last_seen_before
+        schema:
+          type: string
+          format: date-time
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: User name or email
+      - in: query
+        name: status
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - GONE
+            - OUTSIDE
+            - PRESENT
+            - STALE
+            - UNKNOWN
+        description: |-
+          * `UNKNOWN` - No usable information yet
+          * `OUTSIDE` - Confidently outside the area
+          * `PRESENT` - Confidently inside the area
+          * `GONE` - Was present and then confidently left
+          * `STALE` - Was present, then updates stopped arriving
+        explode: true
+        style: form
+      - in: query
+        name: user
+        schema:
+          type: number
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPresenceList'
+          description: ''
+  /api/admin/presence/{user_id}/:
+    get:
+      operationId: admin_presence_retrieve
+      description: Everything an admin needs about one member on one day.
+      summary: Presence detail for one user
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: path
+        name: user_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserPresence'
+          description: ''
+  /api/admin/presence/events/:
+    get:
+      operationId: admin_presence_events_list
+      description: Organization-wide audit trail.
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: event_type
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - ENTERED
+            - EXITED
+            - LOCATION_RESTORED
+            - STALE
+        description: |-
+          * `ENTERED` - Checked in
+          * `EXITED` - Checked out
+          * `STALE` - Updates stopped arriving
+          * `LOCATION_RESTORED` - Updates resumed after a gap
+        explode: true
+        style: form
+      - in: query
+        name: geofence
+        schema:
+          type: number
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: timestamp_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: timestamp_before
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: user
+        schema:
+          type: number
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPresenceEventList'
+          description: ''
+  /api/admin/presence/summary/:
+    get:
+      operationId: admin_presence_summary_retrieve
+      description: Counters for the dashboard header.
+      summary: Presence summary
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: geofence
+        schema:
+          type: integer
+        description: Restrict to one geofence
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresenceSummary'
+          description: ''
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: Exchange email + password for an access/refresh token pair.
+      summary: Log in
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+          description: ''
+  /api/auth/me/:
+    get:
+      operationId: auth_me_retrieve
+      description: The authenticated caller's own profile.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/auth/refresh/:
+    post:
+      operationId: auth_refresh_create
+      description: Rotate the refresh token and issue a new access token.
+      summary: Refresh an access token
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/auth/users/:
+    get:
+      operationId: auth_users_list
+      description: |-
+        Members of the caller's organization (admin only).
+
+        The admin dashboard needs the full roster to report "total users" and to
+        show members who have never sent a location update.
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: role
+        schema:
+          type: string
+      - in: query
+        name: search
+        schema:
+          type: string
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+  /api/auth/users/{id}/:
+    get:
+      operationId: auth_users_retrieve
+      description: A single account, restricted to self or same-organization admins.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/geofences/:
+    get:
+      operationId: geofences_list
+      description: |-
+        Restrict every queryset of a view to the caller's organization.
+
+        Views must define :attr:`organization_field` when the tenancy column is not
+        called ``organization``. A platform admin bypasses the filter and may
+        optionally narrow the result set with ``?organization=<id>``.
+      summary: List geofences
+      parameters:
+      - in: query
+        name: created_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: created_before
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - in: query
+        name: name
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: type
+        schema:
+          type: string
+      tags:
+      - geofences
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGeofenceList'
+          description: ''
+    post:
+      operationId: geofences_create
+      description: |-
+        Restrict every queryset of a view to the caller's organization.
+
+        Views must define :attr:`organization_field` when the tenancy column is not
+        called ``organization``. A platform admin bypasses the filter and may
+        optionally narrow the result set with ``?organization=<id>``.
+      summary: Create a geofence
+      tags:
+      - geofences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeofenceWriteRequest'
+            examples:
+              Circle:
+                value:
+                  name: College Campus
+                  type: CIRCLE
+                  latitude: 29.5976
+                  longitude: 79.6591
+                  radius: 150
+              Rectangle:
+                value:
+                  name: Academic Block
+                  type: RECTANGLE
+                  min_latitude: 29.5971
+                  max_latitude: 29.5983
+                  min_longitude: 79.6581
+                  max_longitude: 79.6601
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GeofenceWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GeofenceWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Geofence'
+          description: ''
+  /api/geofences/{id}/:
+    get:
+      operationId: geofences_retrieve
+      description: |-
+        Restrict every queryset of a view to the caller's organization.
+
+        Views must define :attr:`organization_field` when the tenancy column is not
+        called ``organization``. A platform admin bypasses the filter and may
+        optionally narrow the result set with ``?organization=<id>``.
+      summary: Retrieve a geofence
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this geofence.
+        required: true
+      tags:
+      - geofences
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Geofence'
+          description: ''
+    patch:
+      operationId: geofences_partial_update
+      description: |-
+        Restrict every queryset of a view to the caller's organization.
+
+        Views must define :attr:`organization_field` when the tenancy column is not
+        called ``organization``. A platform admin bypasses the filter and may
+        optionally narrow the result set with ``?organization=<id>``.
+      summary: Update a geofence
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this geofence.
+        required: true
+      tags:
+      - geofences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedGeofenceWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedGeofenceWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedGeofenceWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Geofence'
+          description: ''
+    delete:
+      operationId: geofences_destroy
+      description: |-
+        Restrict every queryset of a view to the caller's organization.
+
+        Views must define :attr:`organization_field` when the tenancy column is not
+        called ``organization``. A platform admin bypasses the filter and may
+        optionally narrow the result set with ``?organization=<id>``.
+      summary: Delete a geofence
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this geofence.
+        required: true
+      tags:
+      - geofences
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/location/anomalies/:
+    get:
+      operationId: location_anomalies_list
+      description: |-
+        Anomaly feed for administrators.
+
+        Deliberately read-only and advisory: nothing here bans or blocks anybody.
+      parameters:
+      - in: query
+        name: anomaly_type
+        schema:
+          type: string
+      - in: query
+        name: created_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: created_before
+        schema:
+          type: string
+          format: date-time
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: severity
+        schema:
+          type: string
+      - in: query
+        name: user
+        schema:
+          type: number
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAnomalyList'
+          description: ''
+  /api/location/history/:
+    get:
+      operationId: location_history_list
+      description: 'The caller''s own stored fixes (privacy: never another user''s).'
+      parameters:
+      - in: query
+        name: is_flagged
+        schema:
+          type: boolean
+      - in: query
+        name: is_trusted
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: recorded_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: recorded_before
+        schema:
+          type: string
+          format: date-time
+      tags:
+      - location
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLocationUpdateList'
+          description: ''
+  /api/location/status/:
+    get:
+      operationId: location_status_retrieve
+      description: |-
+        What the backend currently believes about the caller.
+
+        Also returns the tuning the client should honour, so the PWA never
+        hard-codes an interval or an accuracy threshold.
+      summary: Current location/presence status of the caller
+      tags:
+      - location
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationStatusResponse'
+          description: ''
+  /api/location/update/:
+    post:
+      operationId: location_update_create
+      description: The backend decides presence. Clients must never send a status.
+        Supply `client_event_id` to make retries idempotent.
+      summary: Submit a location update
+      tags:
+      - location
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationUpdateRequestRequest'
+            examples:
+              TypicalFix:
+                value:
+                  latitude: 29.59791
+                  longitude: 79.65887
+                  accuracy: 12
+                  recorded_at: '2026-08-26T12:20:15Z'
+                  client_event_id: 5f0f1f6e-2f2a-4f43-bd0f-1a3c5f9a0e11
+                summary: Typical fix
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LocationUpdateRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LocationUpdateRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationUpdateResponse'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationUpdateResponse'
+          description: ''
+  /api/organizations/:
+    get:
+      operationId: organizations_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrganizationList'
+          description: ''
+    post:
+      operationId: organizations_create
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+          description: ''
+  /api/organizations/{id}/:
+    get:
+      operationId: organizations_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this organization.
+        required: true
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+          description: ''
+    patch:
+      operationId: organizations_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this organization.
+        required: true
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+          description: ''
+  /api/organizations/me/:
+    get:
+      operationId: organizations_me_retrieve
+      description: The caller's own organization.
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+          description: ''
+  /api/presence/me/:
+    get:
+      operationId: presence_me_retrieve
+      description: 'The caller''s presence for one attendance day (default: today).'
+      summary: My presence
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      tags:
+      - presence
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyPresence'
+          description: ''
+  /api/presence/me/events/:
+    get:
+      operationId: presence_me_events_list
+      description: The caller's own audit trail.
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: event_type
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - ENTERED
+            - EXITED
+            - LOCATION_RESTORED
+            - STALE
+        description: |-
+          * `ENTERED` - Checked in
+          * `EXITED` - Checked out
+          * `STALE` - Updates stopped arriving
+          * `LOCATION_RESTORED` - Updates resumed after a gap
+        explode: true
+        style: form
+      - in: query
+        name: geofence
+        schema:
+          type: number
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: timestamp_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: timestamp_before
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: user
+        schema:
+          type: number
+      tags:
+      - presence
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPresenceEventList'
+          description: ''
+  /api/presence/me/history/:
+    get:
+      operationId: presence_me_history_list
+      description: The caller's own presence records over time.
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: geofence
+        schema:
+          type: number
+      - in: query
+        name: last_seen_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: last_seen_before
+        schema:
+          type: string
+          format: date-time
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: User name or email
+      - in: query
+        name: status
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - GONE
+            - OUTSIDE
+            - PRESENT
+            - STALE
+            - UNKNOWN
+        description: |-
+          * `UNKNOWN` - No usable information yet
+          * `OUTSIDE` - Confidently outside the area
+          * `PRESENT` - Confidently inside the area
+          * `GONE` - Was present and then confidently left
+          * `STALE` - Was present, then updates stopped arriving
+        explode: true
+        style: form
+      - in: query
+        name: user
+        schema:
+          type: number
+      tags:
+      - presence
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPresenceList'
+          description: ''
+components:
+  schemas:
+    AdminUserPresence:
+      type: object
+      description: Documentation schema for ``GET /api/admin/presence/{user_id}/``.
+      properties:
+        user_id:
+          type: integer
+        date:
+          type: string
+          format: date
+        effective_status:
+          type: string
+        today:
+          type: array
+          items:
+            $ref: '#/components/schemas/Presence'
+        recent:
+          type: array
+          items:
+            $ref: '#/components/schemas/Presence'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/PresenceEvent'
+      required:
+      - date
+      - effective_status
+      - events
+      - recent
+      - today
+      - user_id
+    Anomaly:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        user_email:
+          type: string
+          format: email
+          readOnly: true
+        user_name:
+          type: string
+          readOnly: true
+        location_update:
+          type: integer
+          readOnly: true
+        anomaly_type:
+          allOf:
+          - $ref: '#/components/schemas/AnomalyTypeEnum'
+          readOnly: true
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/AnomalySeverityEnum'
+          readOnly: true
+        details:
+          readOnly: true
+          description: Structured evidence, e.g. computed speed and window.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - anomaly_type
+      - created_at
+      - details
+      - id
+      - location_update
+      - severity
+      - user
+      - user_email
+      - user_name
+    AnomalySeverityEnum:
+      enum:
+      - LOW
+      - MEDIUM
+      - HIGH
+      type: string
+      description: |-
+        * `LOW` - Informational
+        * `MEDIUM` - Worth reviewing
+        * `HIGH` - Reading excluded from presence decisions
+    AnomalyTypeEnum:
+      enum:
+      - IMPOSSIBLE_SPEED
+      - COORDINATE_JUMP
+      - FUTURE_TIMESTAMP
+      - STATIONARY_REPEAT
+      - POOR_ACCURACY
+      - HIGH_FREQUENCY
+      - STALE_READING
+      type: string
+      description: |-
+        * `IMPOSSIBLE_SPEED` - Implied speed exceeds the plausible maximum
+        * `COORDINATE_JUMP` - Large positional jump in a short window
+        * `FUTURE_TIMESTAMP` - recorded_at is in the future
+        * `STATIONARY_REPEAT` - Identical coordinates repeated for a long period
+        * `POOR_ACCURACY` - Accuracy worse than the acceptable threshold
+        * `HIGH_FREQUENCY` - Update rate above the expected maximum
+        * `STALE_READING` - Fix is old but still within the accepted window
+    ClientConfig:
+      type: object
+      description: Tuning the PWA must honour instead of hard-coding it.
+      properties:
+        recommended_ping_interval_seconds:
+          type: integer
+        max_acceptable_accuracy_m:
+          type: number
+          format: double
+        stale_after_seconds:
+          type: integer
+        max_location_age_seconds:
+          type: integer
+      required:
+      - max_acceptable_accuracy_m
+      - max_location_age_seconds
+      - recommended_ping_interval_seconds
+      - stale_after_seconds
+    ConfidenceEnum:
+      enum:
+      - HIGH
+      - LOW
+      type: string
+      description: |-
+        * `HIGH` - Accuracy within the acceptable threshold
+        * `LOW` - Accuracy worse than the acceptable threshold
+    Geofence:
+      type: object
+      description: Read representation.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        organization_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        type:
+          type: string
+          readOnly: true
+        center_latitude:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Circle centre latitude (WGS84). Required for CIRCLE geofences.
+        center_longitude:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Circle centre longitude (WGS84). Required for CIRCLE geofences.
+        radius:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Nominal circle radius in metres. Required for CIRCLE geofences.
+        min_latitude:
+          type: number
+          format: double
+          readOnly: true
+          description: Southern edge (WGS84). The shape itself for a RECTANGLE.
+        max_latitude:
+          type: number
+          format: double
+          readOnly: true
+          description: Northern edge (WGS84). The shape itself for a RECTANGLE.
+        min_longitude:
+          type: number
+          format: double
+          readOnly: true
+          description: Western edge (WGS84). The shape itself for a RECTANGLE.
+        max_longitude:
+          type: number
+          format: double
+          readOnly: true
+          description: Eastern edge (WGS84). The shape itself for a RECTANGLE.
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        entry_radius:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: 'CIRCLE: radius (m) that must be reached to count as inside.
+            RECTANGLE: how far inside the boundary (m) the device must be.'
+        exit_radius:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: 'CIRCLE: radius (m) that must be exceeded to count as outside.
+            RECTANGLE: how far outside the boundary (m) the device must be. Must be
+            greater than entry_radius; the gap is the hysteresis band.'
+        required_inside_readings:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Consecutive INSIDE readings needed to check in. Null uses the
+            global default.
+        required_outside_readings:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Consecutive OUTSIDE readings needed to check out. Null uses
+            the global default.
+        stale_after_seconds:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Silence after which a PRESENT user becomes STALE. Null uses
+            the global default.
+        effective_thresholds:
+          type: object
+          additionalProperties: {}
+          description: What the evaluator will actually use, defaults resolved.
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - center_latitude
+      - center_longitude
+      - created_at
+      - effective_thresholds
+      - entry_radius
+      - exit_radius
+      - id
+      - is_active
+      - latitude
+      - longitude
+      - max_latitude
+      - max_longitude
+      - min_latitude
+      - min_longitude
+      - name
+      - organization_id
+      - radius
+      - required_inside_readings
+      - required_outside_readings
+      - stale_after_seconds
+      - type
+      - updated_at
+    GeofenceTypeEnum:
+      enum:
+      - CIRCLE
+      - RECTANGLE
+      type: string
+      description: |-
+        * `CIRCLE` - Circle
+        * `RECTANGLE` - Rectangle (bounding box)
+    GeofenceWriteRequest:
+      type: object
+      description: |-
+        Input shape for create/update.
+
+        Only structural checks live here; geometric and business validation is
+        performed by :mod:`geofences.validators` from inside the service so that
+        the exact same rules apply to any other caller (admin site, management
+        commands, data imports).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        type:
+          $ref: '#/components/schemas/GeofenceTypeEnum'
+        latitude:
+          type: number
+          format: double
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+        radius:
+          type: number
+          format: double
+          nullable: true
+        min_latitude:
+          type: number
+          format: double
+          nullable: true
+        max_latitude:
+          type: number
+          format: double
+          nullable: true
+        min_longitude:
+          type: number
+          format: double
+          nullable: true
+        max_longitude:
+          type: number
+          format: double
+          nullable: true
+        entry_radius:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        exit_radius:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        required_inside_readings:
+          type: integer
+          maximum: 20
+          minimum: 1
+          nullable: true
+        required_outside_readings:
+          type: integer
+          maximum: 20
+          minimum: 1
+          nullable: true
+        stale_after_seconds:
+          type: integer
+          maximum: 86400
+          minimum: 30
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+      required:
+      - name
+      - type
+    LastLocation:
+      type: object
+      properties:
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        accuracy:
+          type: number
+          format: double
+        recorded_at:
+          type: string
+          format: date-time
+        received_at:
+          type: string
+          format: date-time
+        confidence:
+          type: string
+        is_trusted:
+          type: boolean
+      required:
+      - accuracy
+      - confidence
+      - is_trusted
+      - latitude
+      - longitude
+      - received_at
+      - recorded_at
+    LastVerdictEnum:
+      enum:
+      - INSIDE
+      - OUTSIDE
+      - UNCERTAIN
+      type: string
+      description: |-
+        * `INSIDE` - Confidently inside the entry boundary
+        * `OUTSIDE` - Confidently outside the exit boundary
+        * `UNCERTAIN` - Inside the hysteresis band or too imprecise to decide
+    LocationStatusResponse:
+      type: object
+      description: Documentation schema for GET /api/location/status/.
+      properties:
+        date:
+          type: string
+          format: date
+        effective_status:
+          type: string
+        geofence_id:
+          type: integer
+          nullable: true
+        geofence_name:
+          type: string
+          nullable: true
+        check_in_at:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_location:
+          allOf:
+          - $ref: '#/components/schemas/LastLocation'
+          nullable: true
+        client_config:
+          $ref: '#/components/schemas/ClientConfig'
+      required:
+      - check_in_at
+      - check_out_at
+      - client_config
+      - date
+      - effective_status
+      - geofence_id
+      - geofence_name
+      - last_location
+      - last_seen_at
+    LocationUpdate:
+      type: object
+      description: Stored fix, as returned by history endpoints.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        latitude:
+          type: number
+          format: double
+          readOnly: true
+        longitude:
+          type: number
+          format: double
+          readOnly: true
+        accuracy:
+          type: number
+          format: double
+          readOnly: true
+          description: Radius of 68% confidence in metres, as reported by the browser.
+        speed:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Metres per second.
+        heading:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Degrees clockwise from true north.
+        altitude:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Metres above WGS84.
+        recorded_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Device clock time of the fix.
+        received_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Server time the fix was accepted.
+        delay_seconds:
+          type: number
+          format: double
+          readOnly: true
+        device_id:
+          type: string
+          readOnly: true
+        session_id:
+          type: string
+          readOnly: true
+        client_event_id:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Client generated idempotency key. Re-POSTing the same key returns
+            the original result instead of creating a duplicate.
+        confidence:
+          allOf:
+          - $ref: '#/components/schemas/ConfidenceEnum'
+          readOnly: true
+          description: |-
+            HIGH when accuracy is within MAX_ACCEPTABLE_ACCURACY_M.
+
+            * `HIGH` - Accuracy within the acceptable threshold
+            * `LOW` - Accuracy worse than the acceptable threshold
+        is_trusted:
+          type: boolean
+          readOnly: true
+          description: False when a HIGH severity anomaly was detected. Untrusted
+            fixes are stored for the audit trail but never drive presence transitions.
+        is_flagged:
+          type: boolean
+          readOnly: true
+          description: At least one anomaly was recorded for this fix.
+        anomalies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Anomaly'
+          readOnly: true
+      required:
+      - accuracy
+      - altitude
+      - anomalies
+      - client_event_id
+      - confidence
+      - delay_seconds
+      - device_id
+      - heading
+      - id
+      - is_flagged
+      - is_trusted
+      - latitude
+      - longitude
+      - received_at
+      - recorded_at
+      - session_id
+      - speed
+      - user
+    LocationUpdateRequestRequest:
+      type: object
+      description: Incoming GPS observation.
+      properties:
+        latitude:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+        longitude:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+        accuracy:
+          type: number
+          format: double
+          minimum: 0
+        recorded_at:
+          type: string
+          format: date-time
+          description: ISO 8601 device timestamp of the fix, with timezone (e.g. 2026-08-26T12:20:15Z).
+        speed:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        heading:
+          type: number
+          format: double
+          maximum: 360
+          minimum: 0
+          nullable: true
+        altitude:
+          type: number
+          format: double
+          nullable: true
+        device_id:
+          type: string
+          maxLength: 64
+        session_id:
+          type: string
+          maxLength: 64
+        client_event_id:
+          type: string
+          nullable: true
+          description: Idempotency key generated by the PWA. Re-sending the same key
+            after a network failure returns the original result instead of duplicating
+            it.
+          maxLength: 64
+      required:
+      - accuracy
+      - latitude
+      - longitude
+      - recorded_at
+    LocationUpdateResponse:
+      type: object
+      description: Documentation schema for POST /api/location/update/.
+      properties:
+        location_update_id:
+          type: integer
+        duplicate:
+          type: boolean
+        trusted:
+          type: boolean
+        recorded_at:
+          type: string
+          format: date-time
+        received_at:
+          type: string
+          format: date-time
+        effective_status:
+          type: string
+        presence:
+          type: array
+          items:
+            $ref: '#/components/schemas/PresenceOutcome'
+        anomalies:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        next_ping_seconds:
+          type: integer
+      required:
+      - anomalies
+      - duplicate
+      - effective_status
+      - location_update_id
+      - next_ping_seconds
+      - presence
+      - received_at
+      - recorded_at
+      - trusted
+    LoginRequest:
+      type: object
+      description: |-
+        Email/password exchange for a JWT pair.
+
+        Written explicitly rather than reusing ``TokenObtainPairSerializer`` so the
+        response shape (tokens *and* the user object) is under our control and the
+        failure message never distinguishes "unknown email" from "wrong password".
+      properties:
+        email:
+          type: string
+          format: email
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    MyPresence:
+      type: object
+      description: Composite payload for ``GET /api/presence/me/``.
+      properties:
+        date:
+          type: string
+          format: date
+        effective_status:
+          type: string
+        geofences:
+          type: array
+          items:
+            $ref: '#/components/schemas/Presence'
+      required:
+      - date
+      - effective_status
+      - geofences
+    Organization:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          description: Short stable identifier used by integrations, e.g. SITARE.
+        timezone:
+          type: string
+          readOnly: true
+          description: IANA timezone used to decide which calendar day an attendance
+            record belongs to.
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - code
+      - created_at
+      - id
+      - is_active
+      - name
+      - timezone
+      - updated_at
+    PaginatedAnomalyList:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        next:
+          type: string
+          nullable: true
+          format: uri
+        previous:
+          type: string
+          nullable: true
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Anomaly'
+    PaginatedGeofenceList:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        next:
+          type: string
+          nullable: true
+          format: uri
+        previous:
+          type: string
+          nullable: true
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Geofence'
+    PaginatedLocationUpdateList:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        next:
+          type: string
+          nullable: true
+          format: uri
+        previous:
+          type: string
+          nullable: true
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationUpdate'
+    PaginatedOrganizationList:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        next:
+          type: string
+          nullable: true
+          format: uri
+        previous:
+          type: string
+          nullable: true
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organization'
+    PaginatedPresenceEventList:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        next:
+          type: string
+          nullable: true
+          format: uri
+        previous:
+          type: string
+          nullable: true
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PresenceEvent'
+    PaginatedPresenceList:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        next:
+          type: string
+          nullable: true
+          format: uri
+        previous:
+          type: string
+          nullable: true
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Presence'
+    PaginatedUserList:
+      type: object
+      properties:
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        next:
+          type: string
+          nullable: true
+          format: uri
+        previous:
+          type: string
+          nullable: true
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    PatchedGeofenceWriteRequest:
+      type: object
+      description: |-
+        Input shape for create/update.
+
+        Only structural checks live here; geometric and business validation is
+        performed by :mod:`geofences.validators` from inside the service so that
+        the exact same rules apply to any other caller (admin site, management
+        commands, data imports).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        type:
+          $ref: '#/components/schemas/GeofenceTypeEnum'
+        latitude:
+          type: number
+          format: double
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+        radius:
+          type: number
+          format: double
+          nullable: true
+        min_latitude:
+          type: number
+          format: double
+          nullable: true
+        max_latitude:
+          type: number
+          format: double
+          nullable: true
+        min_longitude:
+          type: number
+          format: double
+          nullable: true
+        max_longitude:
+          type: number
+          format: double
+          nullable: true
+        entry_radius:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        exit_radius:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        required_inside_readings:
+          type: integer
+          maximum: 20
+          minimum: 1
+          nullable: true
+        required_outside_readings:
+          type: integer
+          maximum: 20
+          minimum: 1
+          nullable: true
+        stale_after_seconds:
+          type: integer
+          maximum: 86400
+          minimum: 30
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+    Presence:
+      type: object
+      description: A presence row as the dashboard needs it.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user_id:
+          type: integer
+          readOnly: true
+        user_name:
+          type: string
+          readOnly: true
+        user_email:
+          type: string
+          format: email
+          readOnly: true
+        organization_id:
+          type: integer
+          readOnly: true
+        geofence_id:
+          type: integer
+          readOnly: true
+        geofence_name:
+          type: string
+          readOnly: true
+        date:
+          type: string
+          format: date
+          readOnly: true
+          description: Attendance day in the organization's timezone, derived from
+            recorded_at.
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PresenceStatusEnum'
+          readOnly: true
+        check_in_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: First ENTERED of the day (device time).
+        check_out_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: Most recent EXITED of the day (device time).
+        last_seen_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: recorded_at of the most recent trusted fix that reached this
+            row.
+        seconds_since_last_seen:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        stale_since:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: Server time the row was marked STALE.
+        current_location:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          description: |-
+            Last known position, with its accuracy.
+
+            Exposed as one object so that a client can never plot a coordinate
+            without the accuracy that qualifies it.
+          readOnly: true
+        last_verdict:
+          allOf:
+          - $ref: '#/components/schemas/LastVerdictEnum'
+          readOnly: true
+        last_distance_m:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+          description: Signed distance to the boundary at the last reading; negative
+            inside.
+        consecutive_inside:
+          type: integer
+          readOnly: true
+        consecutive_outside:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - check_in_at
+      - check_out_at
+      - consecutive_inside
+      - consecutive_outside
+      - created_at
+      - current_location
+      - date
+      - geofence_id
+      - geofence_name
+      - id
+      - last_distance_m
+      - last_seen_at
+      - last_verdict
+      - organization_id
+      - seconds_since_last_seen
+      - stale_since
+      - status
+      - updated_at
+      - user_email
+      - user_id
+      - user_name
+    PresenceEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        user_name:
+          type: string
+          readOnly: true
+        user_email:
+          type: string
+          format: email
+          readOnly: true
+        organization:
+          type: integer
+          readOnly: true
+        geofence:
+          type: integer
+          readOnly: true
+        geofence_name:
+          type: string
+          readOnly: true
+        presence:
+          type: integer
+          readOnly: true
+          nullable: true
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/PresenceEventTypeEnum'
+          readOnly: true
+        reason:
+          allOf:
+          - $ref: '#/components/schemas/ReasonEnum'
+          readOnly: true
+        previous_status:
+          allOf:
+          - $ref: '#/components/schemas/PresenceStatusEnum'
+          readOnly: true
+        new_status:
+          allOf:
+          - $ref: '#/components/schemas/PresenceStatusEnum'
+          readOnly: true
+        latitude:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+        accuracy:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+          readOnly: true
+          description: 'When the transition happened: device time for reading-driven
+            events, server time for timeout-driven events.'
+        metadata:
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - accuracy
+      - created_at
+      - event_type
+      - geofence
+      - geofence_name
+      - id
+      - latitude
+      - longitude
+      - metadata
+      - new_status
+      - organization
+      - presence
+      - previous_status
+      - reason
+      - timestamp
+      - user
+      - user_email
+      - user_name
+    PresenceEventTypeEnum:
+      enum:
+      - ENTERED
+      - EXITED
+      - STALE
+      - LOCATION_RESTORED
+      type: string
+      description: |-
+        * `ENTERED` - Checked in
+        * `EXITED` - Checked out
+        * `STALE` - Updates stopped arriving
+        * `LOCATION_RESTORED` - Updates resumed after a gap
+    PresenceOutcome:
+      type: object
+      description: What one location update did to one presence row.
+      properties:
+        geofence_id:
+          type: integer
+        geofence_name:
+          type: string
+        status:
+          type: string
+        previous_status:
+          type: string
+        changed:
+          type: boolean
+        events:
+          type: array
+          items:
+            type: string
+        verdict:
+          type: string
+        confidence:
+          type: string
+        distance_to_boundary_m:
+          type: number
+          format: double
+        accuracy_margin_m:
+          type: number
+          format: double
+        consecutive_inside:
+          type: integer
+        consecutive_outside:
+          type: integer
+        required_inside_readings:
+          type: integer
+        required_outside_readings:
+          type: integer
+        check_in_at:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - accuracy_margin_m
+      - changed
+      - check_in_at
+      - check_out_at
+      - confidence
+      - consecutive_inside
+      - consecutive_outside
+      - distance_to_boundary_m
+      - events
+      - geofence_id
+      - geofence_name
+      - last_seen_at
+      - previous_status
+      - required_inside_readings
+      - required_outside_readings
+      - status
+      - verdict
+    PresenceStatusEnum:
+      enum:
+      - UNKNOWN
+      - OUTSIDE
+      - PRESENT
+      - GONE
+      - STALE
+      type: string
+      description: |-
+        * `UNKNOWN` - No usable information yet
+        * `OUTSIDE` - Confidently outside the area
+        * `PRESENT` - Confidently inside the area
+        * `GONE` - Was present and then confidently left
+        * `STALE` - Was present, then updates stopped arriving
+    PresenceSummary:
+      type: object
+      description: Documentation schema for the dashboard counters.
+      properties:
+        date:
+          type: string
+        total_users:
+          type: integer
+        tracked_users:
+          type: integer
+        present:
+          type: integer
+        gone:
+          type: integer
+        outside:
+          type: integer
+        stale:
+          type: integer
+        unknown:
+          type: integer
+        by_geofence:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - by_geofence
+      - date
+      - gone
+      - outside
+      - present
+      - stale
+      - total_users
+      - tracked_users
+      - unknown
+    ReasonEnum:
+      enum:
+      - CONSECUTIVE_INSIDE
+      - CONSECUTIVE_OUTSIDE
+      - UPDATES_TIMED_OUT
+      - UPDATES_RESUMED
+      - DAY_ROLLOVER
+      type: string
+      description: |-
+        * `CONSECUTIVE_INSIDE` - Required inside readings reached
+        * `CONSECUTIVE_OUTSIDE` - Required outside readings reached
+        * `UPDATES_TIMED_OUT` - No update within the stale timeout
+        * `UPDATES_RESUMED` - A trusted update arrived after a timeout
+        * `DAY_ROLLOVER` - Attendance day ended while still checked in
+    TokenPairResponse:
+      type: object
+      description: Documentation-only schema for the login response.
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+      - access
+      - refresh
+      - user
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    User:
+      type: object
+      description: Public representation of an account.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        phone_number:
+          type: string
+          readOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/UserRoleEnum'
+          readOnly: true
+        organization_id:
+          type: integer
+          readOnly: true
+        organization_name:
+          type: string
+          readOnly: true
+        organization_timezone:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        is_staff:
+          type: boolean
+          readOnly: true
+          description: Grants access to the Django admin site.
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - date_joined
+      - email
+      - id
+      - is_active
+      - is_staff
+      - name
+      - organization_id
+      - organization_name
+      - organization_timezone
+      - phone_number
+      - role
+      - updated_at
+    UserRoleEnum:
+      enum:
+      - ADMIN
+      - USER
+      type: string
+      description: |-
+        * `ADMIN` - Super administrator
+        * `USER` - User
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+servers:
+- url: http://localhost:8000

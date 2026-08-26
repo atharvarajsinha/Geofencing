@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+next-env.d.ts
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Environment (never commit real values; .env.example is the template)
+.env
+.env.*
+!.env.example
+
+# next-pwa generated service worker and its assets
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+public/fallback-*.js
+
+# Test and coverage output
+coverage/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.log
